@@ -1,6 +1,8 @@
 import argparse
-from module import Module
-from lifter import Lifter
+from parse.parser import SaSSParser
+from sir.module import Module
+from transform.transforms import Transforms
+from lift.lifter import Lifter
 
 def main():
   parser = argparse.ArgumentParser()
@@ -23,14 +25,21 @@ def main():
     # file   = ReplaceRegParamConstMap(file, regs, params, consts)
     # kernel = assemble(file)
 
+    # Create SaSS parser
+    sass_parser = SaSSParser("sm_52", file)
+    
     # Parse file
-    m = Module(args.output_module, file)
+    m = Module(args.output_module, sass_parser)
+
+    # Apply transformations
+    trans = Transforms("SaSS transforms")
+    trans.apply(m)
     
     # Setup LLVM
     lifter = Lifter()
 
     file_name = args.output_module + '.ll'
-    with open(file_name, 'a') as output_file:
+    with open(file_name, 'w') as output_file:
       # Lift to LLVM IR
       m.Lift(lifter, output_file)
     

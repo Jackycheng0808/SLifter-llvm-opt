@@ -12,7 +12,9 @@ class Instruction:
         self.opcodes = opcodes
         self.operands = operands
         self.TwinIdx = ""
-
+        self.TrueBranch = None
+        self.FalseBranch = None
+        
     def GetArgsAndRegs(self):
         regs = []
         args = []
@@ -51,7 +53,12 @@ class Instruction:
 
     def IsStore(self):
         return self.opcodes[0] == "STG"
-    
+
+    # Set all operands as skipped
+    def SetSkip(self):
+        for Operand in self.operands:
+            Operand.Skipped = True
+            
     def ResolveType(self):
         if not self.DirectlySolveType():
             if not self.PartialSolveType():
@@ -99,7 +106,7 @@ class Instruction:
         Def = self.operands[0]
         for i in range(len(Uses)):
             CurrUse = Uses[i]
-            if CurrUse.Name == Def.Name:
+            if CurrUse.IsReg and Def.IsReg and CurrUse.Reg == Def.Reg: # CurrUse.Name == Def.Name:
                 Def.SetTypeDesc(CurrUse.TypeDesc)
                 return True
 
@@ -154,7 +161,7 @@ class Instruction:
         elif self.opcodes[0] == 'IADD':
             TypeDesc = self.operands[0].GetTypeDesc()
             if TypeDesc != None:
-                self.operands[1].SetTypeDesc(TypeDesc)
+                self.operands[1].SetTypeDesc("Int32") # The integer offset
                 self.operands[2].SetTypeDesc(TypeDesc)
         else:
             return False
@@ -183,10 +190,6 @@ class Instruction:
                 # Store result
                 IRBuilder.store(IRVal, IRRes)
                 
-        elif self.opcodes[0] == "ISETP":
-            for i in range(1, len(self.operands)):
-                Operand = self.operands[i]
-
         elif self.opcodes[0] == "SHL":
             ResOp = self.operands[0]
             Op1 = self.operands[1]
@@ -196,7 +199,7 @@ class Instruction:
                 IROp1 = IRRegs[Op1.GetIRRegName(lifter)]
 
                 # Load value
-                Load1 = IRBuilder.load(IROp1, "load")
+                Load1 = IRBuilder.load(IROp1, "loadval")
 
                 # Add 0
                 IRVal = IRBuilder.add(Load1, lifter.ir.Constant(lifter.ir.IntType(32), 0), "add")
@@ -208,21 +211,23 @@ class Instruction:
             ResOp = self.operands[0]
             Op1 = self.operands[1]
             Op2 = self.operands[2]
-                
-            #if Op1.IsReg and Op2.IsArg:
-                #IRRes = IRRegs[ResOp.GetIRRegName(lifter)];
-                #IROp1 = IRRegs[Op1.GetIRRegName(lifter)]
-                #IROp2 = IRArgs[Op2.ArgOffset]
+
+            if Op1.IsReg and Op2.IsArg:
+                IRRes = IRRegs[ResOp.GetIRRegName(lifter)];
+                IROp1 = IRRegs[Op1.GetIRRegName(lifter)]
+                IROp2 = IRArgs[Op2.ArgOffset]
 
                 # Load values
-                #Load1 = IRBuilder.load(IROp1, "load")
-                #Load2 = IRBuilder.load(IROp2, "load")
-
+                Indices = []
+                Load1 = IRBuilder.load(IROp1, "offset")
+                Indices.append(Load1)
+                Load2 = IRBuilder.load(IROp2, "ptr")
+                
                 # Add operands
-                #IRVal = IRBuilder.gep(Load2, Load1, "addr")
+                IRVal = IRBuilder.gep(Load2, Indices, "addr")
 
                 # Store the value
-                #IRBuilder.store(IRVal, IRRes)
+                IRBuilder.store(IRVal, IRRes)
                 
         elif self.opcodes[0] == "S2R":
             ResOp = self.operands[0]
@@ -244,13 +249,10 @@ class Instruction:
                 IRValOp = IRRegs[ValOp.GetIRRegName(lifter)]
 
                 # Load operands
-                LoadPtr = IRBuilder.load(IRPtrOp, "load")
+                LoadPtr = IRBuilder.load(IRPtrOp, "loadptr")
 
-                # Type convert
-                Addr = IRBuilder.inttoptr(LoadPtr, lifter.ir.PointerType(lifter.ir.FloatType()), "cast")
-                
                 # Load instruction
-                IRRes = IRBuilder.load(Addr, "load_inst")
+                IRRes = IRBuilder.load(LoadPtr, "load_inst")
 
                 # Store the result
                 IRBuilder.store(IRRes, IRValOp)
@@ -262,16 +264,43 @@ class Instruction:
                 IRValOp = IRRegs[ValOp.GetIRRegName(lifter)]
 
                 # Load operands
-                LoadPtr = IRBuilder.load(IRPtrOp, "load")
-                LoadVal = IRBuilder.load(IRValOp, "load")
+                Addr = IRBuilder.load(IRPtrOp, "loadptr")
+                Val = IRBuilder.load(IRValOp, "loadval")
 
-                # Type convert
-                Addr = IRBuilder.inttoptr(LoadPtr, lifter.ir.PointerType(lifter.ir.FloatType()), "cast"
-                )
                 # Store instruction
-                IRBuilder.store(LoadVal, Addr)
+                IRBuilder.store(Val, Addr)
+
+    # Lift branch instruction
+    def LiftBranch(self, lifter, IRBuilder, IRRegs, IRArgs, TrueBr, FalseBr):
+        if self.opcodes[0] == "ISETP":
+            Val1Op = self.operands[2]
+            Val2Op = self.operands[3]
+
+            # Check register or arguments
+            IRVal1 = None
+            IRVal2 = None
+            if Val1Op.IsReg:
+                IRVal1 = IRRegs[Val1Op.GetIRRegName(lifter)]
+            elif Val1Op.IsArg:
+                IRVal1 = IRArgs[Val1Op.ArgOffset]
+
+            if Val2Op.IsReg:
+                IRVal2 = IRRegs[Val2Op.GEtIRRegName(lifter)]
+            elif Val2Op.IsArg:
+                IRVal2 = IRArgs[Val2Op.ArgOffset]
+
+            if not IRVal1 == None and not IRVal2 == None:
+                Val1 = IRBuilder.load(IRVal1, "val1")
+                Val2 = IRBuilder.load(IRVal2, "val2")
+
+                # Calculate condition
+                Cmp = IRBuilder.icmp_signed(lifter.GetCmpOp(self.opcodes[1]), Val1, Val2, "cmp")
                 
+                # Branch instruction
+                IRBuilder.cbranch(Cmp, TrueBr, FalseBr)
+            
     def dump(self):
+        print("inst: ", self.id, self.opcodes)
         for operand in self.operands:
             operand.dump()
         

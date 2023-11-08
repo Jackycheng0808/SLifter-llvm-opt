@@ -75,7 +75,7 @@ class BasicBlock:
         for Inst in self.instructions:
             Inst.GetRegs(Regs, lifter)
         
-    def Lift(self, lifter, IRBuilder, IRRegs, IRArgs, IRFunc):
+    def Lift(self, lifter, IRBuilder, IRRegs, IRArgs, BlockMap, IRFunc):
         for i in range(len(self.instructions)):
             Inst = self.instructions[i]
             if Inst.IsBranch():
@@ -89,9 +89,14 @@ class BasicBlock:
                         ExitIRBuilder.ret_void()
                     
                         # Setup jump target
-
+                        TrueBr = ExitBlock
+                        FalseBr = BlockMap[self.succs[0]]
+                        # Lift branch instruction
+                        Inst.LiftBranch(lifter, IRBuilder, IRRegs, IRArgs, TrueBr, FalseBr)
+                        
                         break
-                    
+
+            # Lift instruction
             Inst.Lift(lifter, IRBuilder, IRRegs, IRArgs)
         
     def dump(self):
@@ -99,3 +104,4 @@ class BasicBlock:
         for inst in self.instructions:
             inst.dump();
         print("BB End-------------")
+        

@@ -15,7 +15,8 @@ class Function:
         self.blocks = []
         self.args = []
         self.ArgMap = {}
-        
+        self.BlockMap = {}
+
     # Resovle instructions' operands
     def ResolveOperands(self, insts):
         self.args = []
@@ -41,7 +42,7 @@ class Function:
         for Offset, Operand in SortedArgs.items():
             if Offset < ARG_OFFSET:
                 continue
-            elif Operand.Skipped:
+            elif Operand.Skipped: # This is the case that the operand may be the associated operand
                 continue
             else:
                 ArgIdxes.append(Offset)
@@ -63,8 +64,23 @@ class Function:
             succs = []
             for succ in BB.succs:
                 succs.append(succ.addr_content)
-            print("BB: ", BB.addr_content, succs)
-       
+
+    # Build the map between basic block and its IR version
+    def BuildBBToIRMap(self, IRFunc, BlockMap):
+        IsEntry = True
+        for BB in self.blocks:
+            if IsEntry:
+                BBName = "EntryBB_" + BB.addr_content
+            else:
+                BBName = "BB_" + BB.addr_content
+
+            # Create the basic block
+            IRBlock = IRFunc.append_basic_block(BBName)
+            # Register IR block
+            BlockMap[BB] = IRBlock
+            
+            IsEntry = False
+            
     # Lift to LLVM IR
     def Lift(self, lifter, llvm_module, func_name):
         ArgTypes = []
@@ -77,19 +93,18 @@ class Function:
         FuncTy = lifter.ir.FunctionType(lifter.ir.VoidType(), ArgTypes)
         IRFunc = lifter.ir.Function(llvm_module, FuncTy, self.name)
 
+        # Construct the map based on IR basic block
+        self.BuildBBToIRMap(IRFunc, self.BlockMap)
+        
         IsEntry = True
-        # The argument offset to IR argument map
+        # The argument offset to IR argument map, that is created at the entry block code generation
         IRArgs = {}
-        # The register name to IR register map
+        # The register name to IR register map, that is created at the entry block code generation
         IRRegs = {}
+        
         for BB in self.blocks:
-            if IsEntry:
-                BBName = "EntryBB_" + BB.addr_content
-            else:
-                BBName = "BB_" + BB.addr_content
-
-            # Create basic block
-            IRBlock = IRFunc.append_basic_block(BBName)
+            # Get basic block
+            IRBlock = self.BlockMap[BB] 
             # Create IR builder
             Builder = lifter.ir.IRBuilder(IRBlock)
             
@@ -122,7 +137,8 @@ class Function:
 
 
             # Lift the basic block content
-            BB.Lift(lifter, Builder, IRRegs, IRArgs, IRFunc)
-            
+            BB.Lift(lifter, Builder, IRRegs, IRArgs, self.BlockMap, IRFunc)
+
             IsEntry = False
-            
+
+        

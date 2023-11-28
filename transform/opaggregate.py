@@ -15,41 +15,45 @@ class OperAggregate(SaSSTransform):
     # Identify the twin-index calculation amd merge the twin-idx related instructions
     def IdentifyTwinIdx(self, func, TwinIdxes):
         for bb in func.blocks:
-            insts = bb.instructions
+            Insts = bb.instructions
             # The translated instructions
             TransInsts = []
             # The skipped instructions
             SkipInsts = []
 
             # Scan the instructions to identify the twin-index pattern
-            for i in range(len(insts)):
-                inst = insts[i]
-                if inst in SkipInsts:
+            for i in range(len(Insts)):
+                Inst = Insts[i]
+                if Inst in SkipInsts:
                     continue;
                 
-                if i < len(insts) - 1:
-                    TwinIdx = self.IsTwinIdxPattern(inst, insts[i + 1])
+                if i < len(Insts) - 1:
+                    TwinIdx = self.IsTwinIdxPattern(Inst, Insts[i + 1])
                     if TwinIdx != None:
                         TwinIdxes.append(TwinIdx)
-                        TransInsts.append(self.MutateTwinIdxInst(TwinIdx, inst))
+                        TransInsts.append(self.MutateTwinIdxInst(TwinIdx, Inst))
                         # Set skip flag
-                        SkipInsts.append(insts[i + 1])
+                        SkipInsts.append(Insts[i + 1])
                         
                         continue
 
-                if inst.IsNOP():
-                    SkipInsts.append(inst)
+                if Inst.IsNOP():
+                    SkipInsts.append(Inst)
                 else:
                     # Record the current instruction to translated instructions
-                    TransInsts.append(inst)
-        
+                    TransInsts.append(Inst)
+
+            for Inst in SkipInsts:
+                # Set opeands as skipped
+                Inst.SetSkip()
+                
             # Reset the transformed instructions
             bb.instructions = TransInsts
             
-    def IsTwinIdxPattern(self, inst, nextInst):
-        if inst.opcodes[0] == "SHL":
+    def IsTwinIdxPattern(self, Inst, nextInst):
+        if Inst.opcodes[0] == "SHL":
             if nextInst.opcodes[0] == "SHR":
-                return inst.operands[0].Reg + "-" + nextInst.operands[0].Reg
+                return Inst.operands[0].Reg + "-" + nextInst.operands[0].Reg
 
         return None
 
@@ -61,44 +65,48 @@ class OperAggregate(SaSSTransform):
     # Identify the twin-binary operation
     def IdentifyTwinBin(self, func, TwinIdxes):
         for bb in func.blocks:
-            insts = bb.instructions
+            Insts = bb.instructions
             # The transslated instructions 
             TransInsts = []
             # The skipped instructions
             SkipInsts = []
 
             # Scan the instructions to identify the twin-index pattern
-            for i in range(len(insts)):
-                inst = insts[i]
-                if inst in SkipInsts:
+            for i in range(len(Insts)):
+                Inst = Insts[i]
+                if Inst in SkipInsts:
                     continue
                 
-                if i < len(insts) - 1 and inst.IsAddrCompute():
-                    NextInst = insts[i + 1]
-                    TwinIdx = self.IsTwinBinPattern(inst, NextInst)
-                    if TwinIdx == None and i < len(insts) - 2:
-                        NextInst = insts[i + 2]
-                        TwinIdx = self.IsTwinBinPattern(inst, NextInst)
+                if i < len(Insts) - 1 and Inst.IsAddrCompute():
+                    NextInst = Insts[i + 1]
+                    TwinIdx = self.IsTwinBinPattern(Inst, NextInst)
+                    if TwinIdx == None and i < len(Insts) - 2:
+                        NextInst = Insts[i + 2]
+                        TwinIdx = self.IsTwinBinPattern(Inst, NextInst)
 
                     if TwinIdx != None and TwinIdx in TwinIdxes:
-                        TransInsts.append(self.MutateTwinBinInst(TwinIdx, inst))
+                        TransInsts.append(self.MutateTwinBinInst(TwinIdx, Inst))
                         # Set skip flag
                         SkipInsts.append(NextInst)
                         
                         continue
                         
                 # Record the current instruction to translated instructions
-                TransInsts.append(inst)
+                TransInsts.append(Inst)
 
+            # Set operands as skipped
+            for Inst in SkipInsts:
+                Inst.SetSkip()
+                
             # Reset the transformed instructions
             bb.instructions = TransInsts
 
-    def IsTwinBinPattern(self, inst, nextInst):
+    def IsTwinBinPattern(self, Inst, nextInst):
         # Check the match of operator
-        if inst.opcodes[0] != nextInst.opcodes[0]:
+        if Inst.opcodes[0] != nextInst.opcodes[0]:
             return None
 
-        if len(inst.opcodes) != 1:
+        if len(Inst.opcodes) != 1:
             return None
 
         # The twin idx instructions should be like:
@@ -108,10 +116,10 @@ class OperAggregate(SaSSTransform):
             return None
 
         # Check the function argument operands
-        if len(inst.operands) != 3 or len(nextInst.operands) != 3:
+        if len(Inst.operands) != 3 or len(nextInst.operands) != 3:
             return None
 
-        operand1 = inst.operands[2]
+        operand1 = Inst.operands[2]
         operand2 = nextInst.operands[2]
         # The last operand must be function argument and their offsets value have to be continuous
         if not operand1.IsArg or not operand2.IsArg:
@@ -119,7 +127,7 @@ class OperAggregate(SaSSTransform):
         if operand1.ArgOffset + 4 != operand2.ArgOffset:
             return None
 
-        operand1 = inst.operands[1]
+        operand1 = Inst.operands[1]
         operand2= nextInst.operands[1]
         # The 2nd operand must be register operand
         if operand1.IsReg and operand2.IsReg:

@@ -88,7 +88,7 @@ class TypeAnalysis(SaSSTransform):
                         Defs.append([CurrInst, BB])
                         VisitedInsts.append(CurrInst)
                 if CurrInst.IsLoad():
-                     if CurrInst.CheckAndUpdateDefType(Uses) and not CurrInst in VisitedInsts:
+                    if CurrInst.CheckAndUpdateDefType(Uses) and not CurrInst in VisitedInsts:
                         Defs.append([CurrInst, BB])
                         VisitedInsts.append(CurrInst)
             else:

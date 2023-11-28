@@ -47,6 +47,8 @@ class Function:
             else:
                 ArgIdxes.append(Offset)
                 Args.append(Operand)
+                
+                print("Check Offset ", Offset)
             
         return ArgIdxes, Args
 

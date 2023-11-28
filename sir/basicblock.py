@@ -1,7 +1,7 @@
 from sir.instruction import Instruction
 
 class BasicBlock:
-    def __init__(self, addr_content):
+    def __init__(self, addr_content, ControlCode):
         # The address of the start of this basic block
         self.addr_content = addr_content
         # Calculate the integer offset
@@ -12,6 +12,8 @@ class BasicBlock:
         self.preds = []
         # Successors
         self.succs = []
+        # Control Code
+        self.ControlCode = ControlCode
 
     def AppendInst(self, inst):
         self.instructions.append(inst)

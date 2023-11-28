@@ -9,10 +9,26 @@ class Lifter :
 
         self.ir = ir
 
+    def GetCmpOp(self, Opcode):
+        if Opcode == "GE":
+            return ">="
+        elif Opcode == "EQ":
+            return "=="
+        elif Opcode == "LE":
+            return "<="
+        elif Opcode == "GT":
+            return ">"
+        elif Opcode == "LT":
+            return "<"
+
+        return ""
+        
+            
     def AddIntrinsics(self, llvm_module):
         # Create thread idx function
         FuncTy = self.ir.FunctionType(self.ir.IntType(32), [])
-        IRFunc = self.ir.Function(llvm_module, FuncTy, "thread_idx")
+        FuncName = "thread_idx"
+        IRFunc = self.ir.Function(llvm_module, FuncTy, FuncName)
 
         self.GetThreadIdx = IRFunc
         
@@ -20,10 +36,14 @@ class Lifter :
         module.lift(self, file)
 
     def GetIRType(self, TypeDesc):
-        if (TypeDesc == "Int32"):
+        if TypeDesc == "Int32":
             return self.ir.IntType(32)
-        if (TypeDesc == "Float32"):
+        elif TypeDesc == "Float32":
             return self.ir.FloatType()
+        elif TypeDesc == "Int32_PTR":
+            return self.ir.PointerType(self.ir.IntType(32))
+        elif TypeDesc == "Float32_PTR":
+            return self.ir.PointerType(self.ir.FloatType())
 
         return self.ir.IntType(32)
 

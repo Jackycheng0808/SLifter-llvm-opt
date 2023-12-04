@@ -48,8 +48,6 @@ class Function:
                 ArgIdxes.append(Offset)
                 Args.append(Operand)
                 
-                print("Check Offset ", Offset)
-            
         return ArgIdxes, Args
 
     # Get the registers used in this function
@@ -66,6 +64,7 @@ class Function:
             succs = []
             for succ in BB.succs:
                 succs.append(succ.addr_content)
+            print("BB: ", BB.addr_content, succs)
 
     # Build the map between basic block and its IR version
     def BuildBBToIRMap(self, IRFunc, BlockMap):

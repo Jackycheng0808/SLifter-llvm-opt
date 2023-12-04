@@ -165,8 +165,6 @@ class SaSSParser_SM52:
             # Fill out the ptr related charactors
             Operand_Content = Operand_Content.replace(PTR_PREFIX, "")
             Operand_Content = Operand_Content.replace(PTR_SUFFIX, "")
-
-            # print("revised op content: ", Operand_Content)
             
         # Check if it is a register
         if Operand_Content.find(REG_PREFIX) == 0: # operand starts from 'R'
@@ -198,7 +196,6 @@ class SaSSParser_SM52:
                 Operand_Content = items[0]
         
             ArgOffset = self.GetArgOffset(Operand_Content.replace(ARG_PREFIX, ""))
-            # print("compare: ", ARG_OFFSET, self.ArgOffset)
             if ArgOffset < ARG_OFFSET:
                 IsArg = False
                 IsDim = True
@@ -263,7 +260,6 @@ class SaSSParser_SM52:
         ReadB = (Sec1Num & 1792) >> 8
         WaitB = (Sec1Num & 129024) >> 11
         ControlCodes.append(ControlCode(Content, WaitB, ReadB, WrtB, Yield, Stall))
-        # print("flags ", int("0xf", 16), int("0x10", 16), int("0xe0", 16), int("0x700", 16), int("0x1f800", 16))
 
         return ControlCodes
         
@@ -283,7 +279,6 @@ class SaSSParser_SM52:
             # Handle the direct target case: the next basic block contains exit instruction
             if i < len(Blocks) - 1:
                 self.CheckAndAddTarget(CurrBB, CurrBB.GetDirectTarget(Blocks[i + 1]), JumpTargets)
-            # print("Target ", CurrBB.addr)
 
         MergedTo = {}
         NewBlocks = []
@@ -298,7 +293,6 @@ class SaSSParser_SM52:
                     
                     TargetBB.AddSucc(NextBB)
                     NextBB.AddPred(TargetBB)
-                    print("Connect BB: ", TargetBB.addr_content, NextBB.addr_content)
                 # Reset current basic block, i.e. restart potential merging
                 CurrBB = None
                 
@@ -307,7 +301,6 @@ class SaSSParser_SM52:
                 # Merge two basic blocks
                 CurrBB.Merge(NextBB)
                 MergedTo[NextBB] = CurrBB
-                # print("Merge BB: ", CurrBB.addr_content, NextBB.addr_content)
 
                 continue
             
@@ -329,4 +322,3 @@ class SaSSParser_SM52:
             if TargetAddr not in JumpTargets:
                 JumpTargets[TargetAddr] = []
             JumpTargets[TargetAddr].append(CurrBB)
-            # print("Add Jump Target: ", TargetAddr, CurrBB.addr_content)

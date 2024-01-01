@@ -26,7 +26,7 @@ def main():
     # kernel = assemble(file)
 
     # Create SaSS parser
-    sass_parser = SaSSParser("sm_52", file)
+    sass_parser = SaSSParser(file)
     
     # Parse file
     m = Module(args.output_module, sass_parser)

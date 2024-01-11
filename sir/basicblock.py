@@ -1,7 +1,7 @@
 from sir.instruction import Instruction
 
 class BasicBlock:
-    def __init__(self, addr_content, ControlCode):
+    def __init__(self, addr_content, pflag):
         # The address of the start of this basic block
         self.addr_content = addr_content
         # Calculate the integer offset
@@ -9,22 +9,28 @@ class BasicBlock:
         # Instruction list
         self.instructions = []
         # Predecessor
-        self.preds = []
+        self._preds = []
         # Successors
-        self.succs = []
-        # Control Code
-        self.ControlCode = ControlCode
+        self._succs = []
+        # Path flag
+        self._PFlag = pflag
 
+    @property
+    def PFlag(self):
+        return self._PFlag
+    
     def AppendInst(self, inst):
         self.instructions.append(inst)
         
     def AddPred(self, pred):
-        if pred not in self.preds:
-            self.preds.append(pred)
+        if pred not in self._preds:
+            self._preds.append(pred)
 
     def AddSucc(self, succ):
-        if succ not in self.succs:
-            self.succs.append(succ)
+        if succ not in self._succs:
+            if succ == None:
+                print("Add none successor???")
+            self._succs.append(succ)
 
     def HasBranch(self):
         for inst in self.instructions:
@@ -59,48 +65,99 @@ class BasicBlock:
         # Append instruction list
         self.instructions = self.instructions + another.instructions
         # Erase old successor
-        if another in self.succs:
-            self.succs.remove(another)
+        if another in self._succs:
+            self._succs.remove(another)
         # Add new successor
-        self.succs = self.succs + another.succs
+        self._succs = self._succs + another._succs
         
     # Erase the redundency in basic block
     def EraseRedundency(self):
-        inst = self.instructions[0]
-        if inst.IsExit():
-            # Empty the instruction list and just keep the exit instruction
-            self.instructions = []
-            self.instructions.append(inst)
-
+        #inst = self.instructions[0]
+        #if inst.IsExit():
+        #    # Empty the instruction list and just keep the exit instruction
+        #    self.instructions = []
+        #    self.instructions.append(inst)
+        Idx = 0;
+        while Idx < len(self.instructions):
+            Inst = self.instructions[Idx]
+            if Inst.IsNOP():
+                # Remove NOP instructions
+                self.instructions.remove(Inst)
+            elif Inst.IsExit():
+                Idx = Idx + 1
+                # Erase the rest of instructions
+                if Idx < len(self.instructions):
+                    del self.instructions[Idx : len(self.instructions)] 
+            else:
+                Idx = Idx + 1
+        
     # Collect registers with type
     def GetRegs(self, Regs, lifter):
         for Inst in self.instructions:
             Inst.GetRegs(Regs, lifter)
+
+    # Get the true branch
+    def GetTrueBranch(self, Inst):
+        # Get the branch flag from branch instruction, i.e. P0 or !P0
+        PFlag = Inst.GetBranchFlag()
+        if PFlag == None:
+            return None
+
+        # Get the basic block that contains branch flag from successors
+        for BB in self._succs:
+            BPFlag = BB.PFlag
+            if PFlag == BPFlag:
+                return BB
+
+        return None
+    
+    # Get the false branch
+    def GetFalseBranch(self, Inst):
+        # Get the branch flag from branch instruction, i.e. P0 or !P0
+        PFlag = Inst.GetBranchFlag()
+        if PFlag == None:
+            return None
         
+        # Get the basic block that does not contain the branch flag from successors
+        for BB in self._succs:
+            BPFlag = BB.PFlag
+            if BPFlag == None:
+                return BB
+
+        return None
+    
     def Lift(self, lifter, IRBuilder, IRRegs, IRArgs, BlockMap, IRFunc):
         for i in range(len(self.instructions)):
             Inst = self.instructions[i]
-            if Inst.IsBranch():
-                if i < len(self.instructions) - 1:
-                    NextInst = self.instructions[i + 1]
-                    if NextInst.IsExit():
-                        # Append a basic block to perofrm exit operation
-                        ExitBlock = IRFunc.append_basic_block("Internal_Exit")
-                        ExitIRBuilder = lifter.ir.IRBuilder(ExitBlock)
-                        # Add exit instruction
-                        ExitIRBuilder.ret_void()
-                    
-                        # Setup jump target
-                        TrueBr = ExitBlock
-                        FalseBr = BlockMap[self.succs[0]]
-                        # Lift branch instruction
-                        Inst.LiftBranch(lifter, IRBuilder, IRRegs, IRArgs, TrueBr, FalseBr)
-                        
-                        break
+            #if Inst.IsBranch():
+            #    if i < len(self.instructions) - 1:
+            #        NextInst = self.instructions[i + 1]
+            #        if NextInst.IsExit():
+            #            # Append a basic block to perofrm exit operation
+            #            ExitBlock = IRFunc.append_basic_block("Internal_Exit")
+            #            ExitIRBuilder = lifter.ir.IRBuilder(ExitBlock)
+            #            # Add exit instruction
+            #            ExitIRBuilder.ret_void()
+            #        
+            #            # Setup jump target
+            #            TrueBr = ExitBlock
+            #            FalseBr = BlockMap[self.succs[0]]
+            #            # Lift branch instruction
+            #            Inst.LiftBranch(lifter, IRBuilder, IRRegs, IRArgs, TrueBr, FalseBr)
+            #            
+            #            break
 
+            if Inst.IsBranch():
+                TrueBr = self.GetTrueBranch(Inst)
+                FalseBr = self.GetFalseBranch(Inst)
+                # Lift branch instruction
+                Inst.LiftBranch(lifter, IRBuilder, IRRegs, IRArgs, BlockMap[TrueBr], BlockMap[FalseBr])
+
+                break
+            
             # Lift instruction
             Inst.Lift(lifter, IRBuilder, IRRegs, IRArgs)
-        
+
     def dump(self):
         print("BB Addr: ", self.addr_content)
         for inst in self.instructions:

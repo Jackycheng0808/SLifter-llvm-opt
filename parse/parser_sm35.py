@@ -103,8 +103,7 @@ class SaSSParser_SM35(SaSSParserBase):
 
 
     # Parse control code 
-    def ParseControlCode(self, Content):
-        ControlCodes = []
+    def ParseControlCode(self, Content, ControlCodes):
         Content = Content.replace("/*", "")
         Content = Content.replace(" ", "")
 

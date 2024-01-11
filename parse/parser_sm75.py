@@ -7,13 +7,14 @@ from sir.operand import InvalidOperandException
 
 from parse.parser_base import SaSSParserBase
 
+SM75_CTLCODE_LEN = 1
 
 class SaSSParser_SM35(SaSSParserBase):
     def __init__(self, isa, file):
         self.file = file
 
     # Parse the SaSS text file
-    def apply(self):
+    def applyx(self):
         # List of functions
         Funcs = []
         # List of basic blocks in current function
@@ -102,9 +103,44 @@ class SaSSParser_SM35(SaSSParserBase):
         
         return Funcs
 
+        # Parse the function body from file lines
+    def ParseFuncBody(self, line, Insts, CurrFunc):
+        # Process function body 
+        items = line.split('*/')
+        if len(items) == 2:
+            # Parse the control code
+            self.ParseControlCode(items[0], self.CtlCodes)
+        elif len(items) == 3:    
+            # Retrieve instruction ID
+            inst_id = self.GetInstNum(items[0])
+            # Retrieve instruction opcode
+            inst_opcode, rest_content = self.GetInstOpcode(items[1])
+            rest_content = rest_content.replace(" ", "")
+            if (rest_content == "EXIT"):
+                # Special case for exit instruction
+                inst_ops = inst_opcode
+                inst_opcode = rest_content
+            else:
+                # Retrieve instruction operands
+                inst_ops = self.GetInstOperands(rest_content)
+            
+            # Create instruction
+            inst = self.ParseInstruction(inst_id, inst_opcode, inst_ops, rest_content, CurrFunc)
+
+            # Add control code
+            if len(self.CtlCodes) > 0:
+                CtlCode = self.CtlCodes[0]
+                inst.SetCtlCode(CtlCode)
+                # Remove the control code from temprory storage
+                self.CtlCodes.remove(CtlCode)
+            else:
+                raise UnmatchedControlCode
+            
+            # Add instruction into list
+            Insts.append(inst)
+            
     # Parse control code 
-    def ParseControlCode(self, Content):
-        ControlCodes = []
+    def ParseControlCode(self, Content, ControlCodes):
         Content = Content.replace("/*", "")
         Content = Content.replace(" ", "")
 

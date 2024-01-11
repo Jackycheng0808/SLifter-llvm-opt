@@ -1,4 +1,6 @@
 from sir.operand import Operand
+from sir.controlcode import ControlCode
+from sir.controlcode import PresetCtlCodeException
 
 class UnsupportedOperatorException(Exception):
     pass
@@ -15,7 +17,12 @@ class Instruction:
         self._TwinIdx = ""
         self._TrueBranch = None
         self._FalseBranch = None
+        self._CtlCode = None
 
+    @property
+    def id(self):
+        return self._id
+    
     @property
     def opcodes(self):
         return self._opcodes
@@ -23,6 +30,17 @@ class Instruction:
     @property
     def operands(self):
         return self._operands
+
+    @property
+    def pflag(self):
+        if self._opcodes[0] == "P0" or self_opcodes[0] == "!P0":
+            return self._opcodes[0]
+        else:
+            return None
+
+    @property
+    def controlcode(self):
+        return self._CtlCode
     
     def GetArgsAndRegs(self):
         regs = []
@@ -35,11 +53,25 @@ class Instruction:
 
         return args, regs
 
+    def SetCtlCode(self, CtlCode):
+        if self._CtlCode != None:
+            raise PresetCtlCodeException
+
+        self._CtlCode = CtlCode
+        
     def IsExit(self):
-        return self._opcodes[0] == "EXIT"
+        if self._opcodes[0] == "EXIT":
+            return True
+        elif len(self._opcodes) > 1 and self._opcodes[1] == "EXIT":
+            return True
+
+        return False
 
     def IsBranch(self):
         return self._opcodes[0] == "ISETP"
+
+    def InCondPath(self):
+        return self._opcodes[0] == "P0" or self._opcodes[0] == "!P0"
 
     def IsBinary(self):
         return self._opcodes[0] == "FFMA" or self._opcodes[0] == "FADD" or self._opcodes[0] == "XMAD" or self._opcodes[0] == "SHL" or self._opcodes[0] == "SHR" or self._opcodes[0] == "S2R"
@@ -100,6 +132,14 @@ class Instruction:
 
         return Uses
 
+    # Get branch flag
+    def GetBranchFlag(self):
+        Operand = self._operands[0]
+        if Operand.Name == "P0":
+            return Operand.Name
+        else:
+            return None
+        
     # Check and update the use operand's type from the givenn operand
     def CheckAndUpdateUseType(self, Def):
         for i in range(1, len(self._operands)):
@@ -178,9 +218,13 @@ class Instruction:
         return True
 
     def Lift(self, lifter, IRBuilder, IRRegs, IRArgs):
-        if self._opcodes[0] == "EXIT":
+        Idx = 0
+        if self._opcodes[Idx] == "P0" or self._opcodes[Idx] == "!P0":
+            Idx = Idx + 1
+            
+        if self._opcodes[Idx] == "EXIT":
             IRBuilder.ret_void()
-        elif self._opcodes[0] == "FADD":
+        elif self._opcodes[Idx] == "FADD":
             Res = self._operands[0]
             Op1 = self._operands[1]
             Op2 = self._operands[2]
@@ -199,7 +243,7 @@ class Instruction:
                 # Store result
                 IRBuilder.store(IRVal, IRRes)
                 
-        elif self._opcodes[0] == "SHL":
+        elif self._opcodes[Idx] == "SHL":
             ResOp = self._operands[0]
             Op1 = self._operands[1]
 
@@ -216,7 +260,7 @@ class Instruction:
                 # Store result
                 IRBuilder.store(IRVal, IRRes)
                 
-        elif self._opcodes[0] == "IADD":
+        elif self._opcodes[Idx] == "IADD":
             ResOp = self._operands[0]
             Op1 = self._operands[1]
             Op2 = self._operands[2]
@@ -238,7 +282,7 @@ class Instruction:
                 # Store the value
                 IRBuilder.store(IRVal, IRRes)
                 
-        elif self._opcodes[0] == "S2R":
+        elif self._opcodes[Idx] == "S2R":
             ResOp = self._operands[0]
             ValOp = self._operands[1]
             if ValOp.IsThreadIdx and ResOp.IsReg:
@@ -250,7 +294,7 @@ class Instruction:
                 # Store the result
                 IRBuilder.store(IRVal, IRResOp)
                 
-        elif self._opcodes[0] == "LDG":
+        elif self._opcodes[Idx] == "LDG":
             PtrOp = self._operands[1]
             ValOp = self._operands[0]
             if PtrOp.IsReg and ValOp.IsReg:
@@ -265,7 +309,7 @@ class Instruction:
 
                 # Store the result
                 IRBuilder.store(IRRes, IRValOp)
-        elif self._opcodes[0] == "STG":
+        elif self._opcodes[Idx] == "STG":
             PtrOp = self._operands[0]
             ValOp = self._operands[1]
             if PtrOp.IsReg and ValOp.IsReg:
@@ -281,7 +325,11 @@ class Instruction:
 
     # Lift branch instruction
     def LiftBranch(self, lifter, IRBuilder, IRRegs, IRArgs, TrueBr, FalseBr):
-        if self._opcodes[0] == "ISETP":
+        Idx = 0
+        if self._opcodes[Idx] == "P0" or self.opcodes[Idx] == "!P0":
+            Idx = Idx + 1
+            
+        if self._opcodes[Idx] == "ISETP":
             Val1Op = self._operands[2]
             Val2Op = self._operands[3]
 

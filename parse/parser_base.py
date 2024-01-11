@@ -5,12 +5,19 @@ from sir.controlcode import ControlCode
 from sir.operand import Operand
 from sir.operand import InvalidOperandException
 
+class NoParsingEffort(Exception):
+    pass
+
+class UnmatchedControlCode(Exception):
+    pass
+
 REG_PREFIX = 'R'
 ARG_PREFIX = 'c[0x0]'
 ARG_OFFSET = 320 # 0x140
 THREAD_IDX = 'SR_TID'
 
 PTRREG_PREFIX = '[R'
+PATH_PREFIX = 'P'
 PTR_PREFIX = '['
 PTR_SUFFIX = ']'
 
@@ -22,8 +29,69 @@ class SaSSParserBase:
     def apply(self):
         # List of functions
         Funcs = []
+
+        # The current function that is under parsing
+        CurrFunc = None
+
+        # The instruction list
+        Insts = []
         
+        # Main loop that parse the SaSS text file
+        for line_num, line in enumerate(self.file.split('\n')):
+            # Process lines in SaSS text file
+
+            # Process function title and misc
+            PrevFunc = CurrFunc
+            CurrFunc = self.CreateFunction(line, PrevFunc, Insts)
+            if PrevFunc != CurrFunc and CurrFunc != None:
+                # Just create a new functino
+                if PrevFunc != None:
+                    # Add the parsed function
+                    Funcs.append(PrevFunc)
+                    # Clean the instruction list
+                    Insts = []
+                    
+                continue
+            else:
+                CurrFunc = PrevFunc
+                
+            # Process function body
+            self.ParseFuncBody(line, Insts, CurrFunc)
+
+        # Process the last function
+        if CurrFunc != None:
+            # Wrap up previous function by creating control-flow graph
+            CurrFunc.blocks = self.CreateCFG(self.SplitBlocks(Insts))
+
+            # Add the parsed function
+            Funcs.append(CurrFunc)
+            
         return Funcs
+
+    # Parse the file line to create new function
+    def CreateFunction(self, line, PrevFunc, Insts):
+        if (not ("/*" in line and "*/" in line)):
+            # Check function start
+            if ("Function : " in line):
+                # Wrap up previous function by creating control-flow graph
+                if PrevFunc != None:
+                    CurrFunc.blocks = self.CreateCFG(self.SplitBlocks(Insts))
+                    
+                # Check the function name
+                items = line.split(' : ')
+
+                # Create new function
+                return Function(items[1])
+
+        return None
+
+    # Parse the function body from file lines
+    def ParseFuncBody(self, line, Insts):
+        raise NoParsingEffort
+
+    # Split basic block from the list instruction
+    def SplitBlocks(self, Insts):
+        raise NoParsingEffort
 
     # Retrieve instruction ID
     def GetInstNum(self, line):
@@ -37,9 +105,18 @@ class SaSSParserBase:
         items = line.split(' ')
         # Get opcode
         opcode = items[0]
+        PFlag = None
+        # Handle the condntion branch flags
+        if opcode == "@P0":
+            PFlag = "P0"
+            opcode = items[1]
+        elif opcode == "@!P0":
+            PFlag = "!P0"
+            opcode = items[1]
+        
         rest_content = line.replace(items[0], "")
             
-        return opcode, rest_content
+        return opcode, PFlag, rest_content
 
     # Retrieve instruction's operands
     def GetInstOperands(self, line):
@@ -53,9 +130,11 @@ class SaSSParserBase:
         return ops 
 
     # Parse instruction, includes operators and operands
-    def ParseInstruction(self, InstID, Opcode_Content, Operands_Content, Operands_Detail, CurrFunc):
+    def ParseInstruction(self, InstID, Opcode_Content, PFlag, Operands_Content, Operands_Detail, CurrFunc):
         # Parse opcodes
         Opcodes = Opcode_Content.split('.')
+        if PFlag != None:
+            Opcodes.insert(0, PFlag)
 
         # Parse operands
         Operands = []
@@ -84,7 +163,7 @@ class SaSSParserBase:
             Operand_Content = Operand_Content.replace(PTR_SUFFIX, "")
             
         # Check if it is a register
-        if Operand_Content.find(REG_PREFIX) == 0: # operand starts from 'R'
+        if Operand_Content.find(REG_PREFIX) == 0: # operand starts from 'R' 
             IsReg = True
             Reg = Operand_Content
             Name = Operand_Content
@@ -97,6 +176,14 @@ class SaSSParserBase:
                 if len(items) > 2:
                     raise InvalidOperandException
                 
+            return Operand(Name, Reg, Suffix, ArgOffset, IsReg, IsArg, IsDim, IsThreadIdx)
+
+        # Check if it is a jump flag
+        if Operand_Content.find(PATH_PREFIX) == 0: # operand starts from 'P'
+            IsReg = True
+            Reg = Operand_Content
+            Name = Operand_Content
+
             return Operand(Name, Reg, Suffix, ArgOffset, IsReg, IsArg, IsDim, IsThreadIdx)
         
         # Check if it is a function argument or dimension related value
@@ -141,13 +228,11 @@ class SaSSParserBase:
         return int(offset, base = 16)
 
     # Parse control code 
-    def ParseControlCode(self, Content):
-        ControlCodes = []
-       
-        return ControlCodes
-        
-    # Create the control-flow graph
-    def CreateCFG(self, Blocks):
+    def ParseControlCode(self, Content, ControlCodes):
+       raise NoParsingEffort
+   
+    # Build the control-flow graph
+    def BuildCFG(self, Blocks):
         # No need to process single basic block case
         if len(Blocks) == 1:
             return Blocks
@@ -199,6 +284,18 @@ class SaSSParserBase:
                 
         return NewBlocks
 
+    #Create the control-flow graph
+    def CreateCFG(self, Blocks):
+        # No need to process single basic block case
+        if len(Blocks) == 1:
+            return Blocks
+
+        for BB in Blocks:
+            BB.EraseRedundency()
+            # BB.dump()
+            
+        return Blocks
+    
     # Check if the target address is legal, then add the target address associated with its jump source
     def CheckAndAddTarget(self, CurrBB, TargetAddr, JumpTargets):
         if TargetAddr > 0:

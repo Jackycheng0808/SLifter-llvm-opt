@@ -4,8 +4,9 @@ class BasicBlock:
     def __init__(self, addr_content, pflag):
         # The address of the start of this basic block
         self.addr_content = addr_content
-        # Calculate the integer offset
-        self.addr = int(addr_content, base = 16)
+        if addr_content != None:
+            # Calculate the integer offset
+            self.addr = int(addr_content, base = 16)
         # Instruction list
         self.instructions = []
         # Predecessor
@@ -39,6 +40,20 @@ class BasicBlock:
             
         return False
 
+    # Check if the basic block was initialized normally
+    def IsInitialized(self):
+        return self.addr_content != None
+
+    # Initialize the basic bloci with entry address and branch flag
+    def Init(self, addr_content, pflag):
+        self.addr_content = addr_content
+        self.addr = int(addr_content, base = 16)
+        self._PFlag = pflag
+    
+    # Check if the basic block contains any instructions
+    def IsEmpty(self):
+        return len(self.instructions) == 0
+    
     def GetBranchTarget(self):
         for i in range(len(self.instructions)):
             inst = self.instructions[i]
@@ -129,24 +144,7 @@ class BasicBlock:
     def Lift(self, lifter, IRBuilder, IRRegs, IRArgs, BlockMap, IRFunc):
         for i in range(len(self.instructions)):
             Inst = self.instructions[i]
-            #if Inst.IsBranch():
-            #    if i < len(self.instructions) - 1:
-            #        NextInst = self.instructions[i + 1]
-            #        if NextInst.IsExit():
-            #            # Append a basic block to perofrm exit operation
-            #            ExitBlock = IRFunc.append_basic_block("Internal_Exit")
-            #            ExitIRBuilder = lifter.ir.IRBuilder(ExitBlock)
-            #            # Add exit instruction
-            #            ExitIRBuilder.ret_void()
-            #        
-            #            # Setup jump target
-            #            TrueBr = ExitBlock
-            #            FalseBr = BlockMap[self.succs[0]]
-            #            # Lift branch instruction
-            #            Inst.LiftBranch(lifter, IRBuilder, IRRegs, IRArgs, TrueBr, FalseBr)
-            #            
-            #            break
-
+           
             if Inst.IsBranch():
                 TrueBr = self.GetTrueBranch(Inst)
                 FalseBr = self.GetFalseBranch(Inst)

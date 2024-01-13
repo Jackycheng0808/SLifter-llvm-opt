@@ -5,6 +5,9 @@ from sir.controlcode import PresetCtlCodeException
 class UnsupportedOperatorException(Exception):
     pass
 
+class UnsupportedInstructionException(Exception):
+    pass
+
 class InvalidTypeException(Exception):
     pass
 
@@ -68,19 +71,31 @@ class Instruction:
         return False
 
     def IsBranch(self):
-        return self._opcodes[0] == "ISETP"
+        Idx = 0
+        if self._opcodes[Idx] == "P0" or self._opcodes[Idx] == "!P0":
+            Idx = Idx + 1
+        return self._opcodes[Idx] == "ISETP" 
 
     def InCondPath(self):
         return self._opcodes[0] == "P0" or self._opcodes[0] == "!P0"
 
     def IsBinary(self):
-        return self._opcodes[0] == "FFMA" or self._opcodes[0] == "FADD" or self._opcodes[0] == "XMAD" or self._opcodes[0] == "SHL" or self._opcodes[0] == "SHR" or self._opcodes[0] == "S2R"
+        Idx = 0
+        if self._opcodes[Idx] == "P0" or self._opcodes[Idx] == "!P0":
+            Idx = Idx + 1
+        return self._opcodes[Idx] == "FFMA" or self._opcodes[Idx] == "FADD" or self._opcodes[Idx] == "XMAD" or self._opcodes[Idx] == "IMAD" or self._opcodes[Idx] == "SHL" or self._opcodes[Idx] == "SHR" or self._opcodes[Idx] == "SHF" or self._opcodes[Idx] == "S2R"
     
     def IsNOP(self):
-        return self._opcodes[0] == "NOP"
+        Idx = 0
+        if self._opcodes[Idx] == "P0" or self._opcodes[Idx] == "!P0":
+            Idx = Idx + 1
+        return self._opcodes[Idx] == "NOP"
 
     def IsAddrCompute(self):
-        if self._opcodes[0] == "IADD":
+        Idx = 0
+        if self._opcodes[Idx] == "P0" or self._opcodes[Idx] == "!P0":
+            Idx = Idx + 1
+        if self._opcodes[Idx] == "IADD":
             # Check operands
             if len(self._operands) == 3:
                 operand = self._operands[2]
@@ -90,10 +105,16 @@ class Instruction:
         return False
 
     def IsLoad(self):
-        return self._opcodes[0] == "LDG"
+        Idx = 0
+        if self._opcodes[Idx] == "P0" or self._opcodes[Idx] == "!P0":
+            Idx = Idx + 1
+        return self._opcodes[Idx] == "LDG" or self._opcodes[Idx] == "SULD"
 
     def IsStore(self):
-        return self._opcodes[0] == "STG"
+        Idx = 0
+        if self._opcodes[Idx] == "P0" or self._opcodes[Idx] == "!P0":
+            Idx = Idx + 1
+        return self._opcodes[Idx] == "STG" or self._opcodes[Idx] == "SUST"
 
     # Set all operands as skipped
     def SetSkip(self):
@@ -103,6 +124,7 @@ class Instruction:
     def ResolveType(self):
         if not self.DirectlySolveType():
             if not self.PartialSolveType():
+                print("checking ", self._opcodes[0])
                 raise UnsupportedOperatorException
 
     # Collect registers used in instructions
@@ -163,20 +185,27 @@ class Instruction:
     
     # Directly resolve the type description, this is mainly working for binary operation
     def DirectlySolveType(self):
+        Idx = 0
+        if self._opcodes[Idx] == "P0" or self._opcodes[Idx] == "!P0":
+            Idx = Idx + 1
         TypeDesc = None
-        if self._opcodes[0] == "FFMA":
+        if self._opcodes[Idx] == "FFMA":
             TypeDesc = "Float32"
-        elif self._opcodes[0] == "FADD":
+        elif self._opcodes[Idx] == "FADD":
             TypeDesc = "Float32"
-        elif self._opcodes[0] == "XMAD":
+        elif self._opcodes[Idx] == "XMAD":
             TypeDesc = "INT"
-        elif self._opcodes[0] == "SHL":
+        elif self._opcodes[Idx] == "IMAD":
             TypeDesc = "INT"
-        elif self._opcodes[0] == "SHR":
+        elif self._opcodes[Idx] == "SHL":
             TypeDesc = "INT"
-        elif self._opcodes[0] == "S2R":
+        elif self._opcodes[Idx] == "SHR":
             TypeDesc = "INT"
-        elif self._opcodes[0] == "ISETP":
+        elif self._opcodes[Idx] == "SHF":
+            TypeDesc = "INT"
+        elif self._opcodes[Idx] == "S2R":
+            TypeDesc = "INT"
+        elif self._opcodes[Idx] == "ISETP":
             TypeDesc = "INT"
         else:
             return False
@@ -197,7 +226,27 @@ class Instruction:
                     self._operands[0].SetTypeDesc(TypeDesc.replace('_PTR', ""))
                 else:
                     raise InvalidTypeException
+        elif self._opcodes[0] == "SULD":
+            TypeDesc = self._operands[0].GetTypeDesc()
+            if TypeDesc != None:
+                self._operands[1].SetTypeDesc(TypeDesc + "_PTR")
+            else:
+                TypeDesc = self._operands[1].GetTypeDesc()
+                if TypeDesc != None:
+                    self._operands[0].SetTypeDesc(TypeDesc.replace('_PTR', ""))
+                else:
+                    raise InvalidTypeException
         elif self._opcodes[0] == "STG":
+            TypeDesc = self._operands[1].GetTypeDesc()
+            if TypeDesc != None:
+                self._operands[0].SetTypeDesc(TypeDesc + "_PTR")
+            else:
+                TypeDesc = self._operands[0].GetTypeDesc()
+                if TypeDesc != None:
+                    self._operands[0].SetTypeDesc(TypeDesc.replace('_PTR', ""))
+                else:
+                    raise InvalidTypeException
+        elif self._opcodes[0] == "SUST":
             TypeDesc = self._operands[1].GetTypeDesc()
             if TypeDesc != None:
                 self._operands[0].SetTypeDesc(TypeDesc + "_PTR")
@@ -222,7 +271,28 @@ class Instruction:
         if self._opcodes[Idx] == "P0" or self._opcodes[Idx] == "!P0":
             Idx = Idx + 1
             
-        if self._opcodes[Idx] == "EXIT":
+        if self._opcodes[Idx] == "MOV":
+            ResOp = self._operands[0]
+            Op1 = self._operands[1]
+        
+            if ResOp.IsReg and Op1.IsReg:
+                IRRes = IRRegs[ResOp.GetIRRegName(lifter)]
+                IROp1 = IRRegs[Op1.GetIRRegName(lifter)]
+
+                # Load value
+                #IRVal = IRBuilder.load(IROp1, "loadval")
+
+                # Store result
+                #IRBuilder.store(IRVal, IRRes)
+        elif self._opcodes[Idx] == "IMAD":
+            ResOp = self._operands[0]
+            Op1 = self._operands[1]
+            # TODO
+        elif self._opcodes[Idx] == "XMAD":
+            ResOp = self._operands[1]
+            Op1 = self._operands[1]
+            # TODO
+        elif self._opcodes[Idx] == "EXIT":
             IRBuilder.ret_void()
         elif self._opcodes[Idx] == "FADD":
             Res = self._operands[0]
@@ -246,6 +316,7 @@ class Instruction:
         elif self._opcodes[Idx] == "SHL":
             ResOp = self._operands[0]
             Op1 = self._operands[1]
+            Op2 = self._operands[2]
 
             if ResOp.IsReg and Op1.IsReg:
                 IRRes = IRRegs[ResOp.GetIRRegName(lifter)]
@@ -255,7 +326,43 @@ class Instruction:
                 Load1 = IRBuilder.load(IROp1, "loadval")
 
                 # Add 0
-                IRVal = IRBuilder.add(Load1, lifter.ir.Constant(lifter.ir.IntType(32), 0), "add")
+                IRVal = IRBuilder.shl(Load1, lifter.ir.Constant(lifter.ir.IntType(32), 0), "add")
+
+                # Store result
+                IRBuilder.store(IRVal, IRRes)
+
+        elif self._opcodes[Idx] == "SHR":
+            ResOp = self._operands[0]
+            Op1 = self._operands[1]
+            Op2 = self._operands[2]
+
+            if ResOp.IsReg and Op1.IsReg:
+                IRRes = IRRegs[ResOp.GetIRRegName(lifter)]
+                IROp1 = IRRegs[Op1.GetIRRegName(lifter)]
+
+                # Load value
+                Load1 = IRBuilder.load(IROp1, "loadval")
+
+                # Add 0
+                IRVal = IRBuilder.shl(Load1, lifter.ir.Constant(lifter.ir.IntType(32), 0), "add")
+
+                # Store result
+                IRBuilder.store(IRVal, IRRes)
+
+        elif self._opcodes[Idx] == "SHF":
+            ResOp = self._operands[0]
+            Op1 = self._operands[1]
+            Op2 = self._operands[2]
+
+            if ResOp.IsReg and Op1.IsReg:
+                IRRes = IRRegs[ResOp.GetIRRegName(lifter)]
+                IROp1 = IRRegs[Op1.GetIRRegName(lifter)]
+
+                # Load value
+                Load1 = IRBuilder.load(IROp1, "loadval")
+
+                # Add 0
+                IRVal = IRBuilder.shl(Load1, lifter.ir.Constant(lifter.ir.IntType(32), 0), "add")
 
                 # Store result
                 IRBuilder.store(IRVal, IRRes)
@@ -309,6 +416,23 @@ class Instruction:
 
                 # Store the result
                 IRBuilder.store(IRRes, IRValOp)
+
+        elif self._opcodes[Idx] == "SULD":
+            PtrOp = self._operands[1]
+            ValOp = self._operands[0]
+            #if PtrOp.IsReg and ValOp.IsReg:
+                #IRPtrOp = IRRegs[PtrOp.GetIRRegName(lifter)]
+                #IRValOp = IRRegs[ValOp.GetIRRegName(lifter)]
+
+                # Load operands
+                #LoadPtr = IRBuilder.load(IRPtrOp, "loadptr")
+
+                # Load instruction
+                #IRRes = IRBuilder.load(LoadPtr, "load_inst")
+
+                # Store the result
+                #IRBuilder.store(IRRes, IRValOp)
+                
         elif self._opcodes[Idx] == "STG":
             PtrOp = self._operands[0]
             ValOp = self._operands[1]
@@ -323,6 +447,46 @@ class Instruction:
                 # Store instruction
                 IRBuilder.store(Val, Addr)
 
+        elif self._opcodes[Idx] == "SUST":
+            PtrOp = self._operands[0]
+            ValOp = self._operands[1]
+            #if PtrOp.IsReg and ValOp.IsReg:
+                #IRPtrOp = IRRegs[PtrOp.GetIRRegName(lifter)]
+                #IRValOp = IRRegs[ValOp.GetIRRegName(lifter)]
+
+                # Load operands
+                #Addr = IRBuilder.load(IRPtrOp, "loadptr")
+                #Val = IRBuilder.load(IRValOp, "loadval")
+
+                # Store instruction
+                # IRBuilder.store(Val, Addr)
+
+        elif self._opcodes[Idx] == "FFMA":
+            ResOp = self._operands[0]
+            Op1 = self._operands[1]
+            Op2 = self._operands[2]
+
+            if Op1.IsReg and Op2.IsArg:
+                IRRes = IRRegs[ResOp.GetIRRegName(lifter)];
+                IROp1 = IRRegs[Op1.GetIRRegName(lifter)]
+                IROp2 = IRArgs[Op2.ArgOffset]
+
+                # Load values
+                Indices = []
+                Load1 = IRBuilder.load(IROp1, "offset")
+                Indices.append(Load1)
+                Load2 = IRBuilder.load(IROp2, "ptr")
+                
+                # Add operands
+                #IRVal = IRBuilder.mul(Load2, Indices, "mul")
+
+                # Store the value
+                #IRBuilder.store(IRVal, IRRes)
+                
+        else:
+            print("lift instruction: ", self._opcodes[Idx])
+            raise UnsupportedInstructionException 
+            
     # Lift branch instruction
     def LiftBranch(self, lifter, IRBuilder, IRRegs, IRArgs, TrueBr, FalseBr):
         Idx = 0

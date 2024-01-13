@@ -180,25 +180,19 @@ class SaSSParser_SM52(SaSSParserBase):
     # Split basic block from the list instruction
     def SplitBlocks(self, Insts):
         BBs = []
-
+        BranchBBs = []
+        
         # Initialize current basic block
         CurrBB = None
         PredBB = None
         BranchBB = None
-        
+
         for Inst in Insts:
             if Inst.InCondPath():
-                if BranchBB == None:
+                if not BranchBB.IsInitialized():
                     # Create the new branch basic block
-                    BranchBB = BasicBlock(Inst.id, Inst.pflag)
-                    BBs.append(BranchBB)
+                    BranchBB.Init(Inst.id, Inst.pflag)
 
-                    # Add branch connection
-                    if PredBB != None:
-                        # Setup cpnnection
-                        PredBB.AddSucc(BranchBB)
-                        BranchBB.AddPred(PredBB)
-                    
                 # Add instruction into branch basic block
                 BranchBB.AppendInst(Inst)
                 
@@ -223,6 +217,22 @@ class SaSSParser_SM52(SaSSParserBase):
 
                     # Cleanup current basic block and branch basic block
                     CurrBB = None
-                    BranchBB = None
-                    
+
+                    if BranchBB != None and BranchBB.IsEmpty():
+                        # The previous branch instruction does not make corresponding branch BB yet, so it will follow with current branch instruction
+                        # Setup the predecessor and successor for branch basic block
+                        PredBB.AddSucc(BranchBB)
+                        BranchBB.AddPred(PredBB)
+                    else:
+                        # Create an empty basic block
+                        BranchBB = BasicBlock(None, None)
+                        BranchBBs.append(BranchBB)
+
+                        # Setup the predecessor and successor for branch basic block
+                        PredBB.AddSucc(BranchBB)
+                        BranchBB.AddPred(PredBB)
+
+        for BranchBB in BranchBBs:
+            BBs.append(BranchBB)
+            
         return BBs

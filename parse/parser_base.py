@@ -293,7 +293,7 @@ class SaSSParserBase:
         for BB in Blocks:
             BB.EraseRedundency()
             # BB.dump()
-            
+
         return Blocks
     
     # Check if the target address is legal, then add the target address associated with its jump source

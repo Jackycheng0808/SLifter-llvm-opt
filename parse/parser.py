@@ -1,5 +1,6 @@
 from parse.parser_sm52 import SaSSParser_SM52
 from parse.parser_sm35 import SaSSParser_SM35
+from parse.parser_sm75 import SaSSParser_SM75
 
 class InvalidISAException(Exception):
     pass

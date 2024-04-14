@@ -160,7 +160,7 @@ class SaSSParser_SM75(SaSSParserBase):
         
         return ControlCodes
       
-        # Split basic block from the list instruction
+    # Split basic block from the list instruction
     def SplitBlocks(self, Insts):
         BBs = []
         BranchBBs = []

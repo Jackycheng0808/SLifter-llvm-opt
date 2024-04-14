@@ -67,7 +67,10 @@ class Operand:
     # Get the type description
     def GetTypeDesc(self):
         return self._TypeDesc
-    
+
+    def HasTypeDesc(self):
+        return self._TypeDesc != "NOTYPE"
+
     def GetIRType(self, lifter):
         if self._IRType == None:
             self._IRType = lifter.GetIRType(self._TypeDesc)

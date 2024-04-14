@@ -148,9 +148,12 @@ class BasicBlock:
             if Inst.IsBranch():
                 TrueBr = self.GetTrueBranch(Inst)
                 FalseBr = self.GetFalseBranch(Inst)
-                # Lift branch instruction
-                Inst.LiftBranch(lifter, IRBuilder, IRRegs, IRArgs, BlockMap[TrueBr], BlockMap[FalseBr])
-
+                try:
+                    # Lift branch instruction
+                    Inst.LiftBranch(lifter, IRBuilder, IRRegs, IRArgs, BlockMap[TrueBr], BlockMap[FalseBr])
+                except Exception as e:
+                    lifter.lift_errors.append(e)
+                    
                 break
             
             # Lift instruction

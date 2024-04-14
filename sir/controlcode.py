@@ -10,3 +10,5 @@ class ControlCode:
         self.Yield = Yield
         self.Stall = Stall
         
+    def dump(self):
+        print("wait {} read {} wrt {} yield {} stall {}".format(self.WaitB, self.ReadB, self.WrtB, self.Yield, self.Stall))

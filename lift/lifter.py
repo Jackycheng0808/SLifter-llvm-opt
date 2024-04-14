@@ -8,7 +8,8 @@ class Lifter :
         binding.initialize_native_asmprinter()
 
         self.ir = ir
-
+        self.lift_errors = []
+        
     def GetCmpOp(self, Opcode):
         if Opcode == "GE":
             return ">="

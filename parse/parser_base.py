@@ -2,6 +2,7 @@ from sir.function import Function
 from sir.basicblock import BasicBlock
 from sir.instruction import Instruction
 from sir.controlcode import ControlCode
+from sir.defuse import DefUse
 from sir.operand import Operand
 from sir.operand import InvalidOperandException
 
@@ -60,6 +61,9 @@ class SaSSParserBase:
 
         # Process the last function
         if CurrFunc != None:
+            # Create def-use chain
+            CurrFunc.DefUse = self.CreateDefUse(Insts)
+            
             # Wrap up previous function by creating control-flow graph
             CurrFunc.blocks = self.CreateCFG(self.SplitBlocks(Insts))
 
@@ -302,3 +306,19 @@ class SaSSParserBase:
             if TargetAddr not in JumpTargets:
                 JumpTargets[TargetAddr] = []
             JumpTargets[TargetAddr].append(CurrBB)
+
+    # Create def-use chain
+    def CreateDefUse(self, Insts):
+        DU = DefUse()
+
+        # The table of current definition
+        CurrDefs = {}
+        
+        # Iterate through instructions
+        #for Inst in Insts:
+            
+            # Check the use and connect the defs
+            
+            # Get def and put on current defs table
+
+            #Inst.controlcode.dump()

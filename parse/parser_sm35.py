@@ -10,9 +10,10 @@ from parse.parser_base import SaSSParserBase
 class SaSSParser_SM35(SaSSParserBase):
     def __init__(self, isa, file):
         self.file = file
-
+        self.CtlCodes = []
+        
     # Parse the SaSS text file
-    def apply(self):
+    def applyx(self):
         # List of functions
         Funcs = []
         # List of basic blocks in current function
@@ -35,7 +36,7 @@ class SaSSParser_SM35(SaSSParserBase):
             # Process lines in SaSS text file
 
             # Process function title and misc
-            if (not ("/*" in line and "*/" in line)):
+            if (not ("/*" in line and "*/" in line)): 
                 # Check function start
                 if ("Function : " in line):
                     # Wrap up previous function
@@ -62,7 +63,7 @@ class SaSSParser_SM35(SaSSParserBase):
                 IsParsingBB = False
 
                 # Parse the control code
-                CurrCtrCodes = self.ParseControlCode(items[0])
+                CurrCtrCodes = self.ParseControlCode(items[0], self.CtlCodes)
                 
                 continue;
             elif len(items) == 3 and not IsParsingBB:
@@ -101,6 +102,37 @@ class SaSSParser_SM35(SaSSParserBase):
         
         return Funcs
 
+    # Parse the function body from file lines
+    def ParseFuncBody(self, line, Insts, CurrFunc):
+        # Process function body 
+        items = line.split('*/')
+        if len(items) == 2:
+            # Parse the control code
+            self.ParseControlCode(items[0], self.CtlCodes)
+        elif len(items) == 3:    
+            # Retrieve instruction ID
+            inst_id = self.GetInstNum(items[0])
+            # Retrieve instruction opcode
+            inst_opcode, pflag, rest_content = self.GetInstOpcode(items[1])
+            rest_content = rest_content.replace(" ", "")
+
+            # Retrieve instruction operands
+            inst_ops = self.GetInstOperands(rest_content)
+            
+            # Create instruction
+            inst = self.ParseInstruction(inst_id, inst_opcode, pflag, inst_ops, rest_content, CurrFunc)
+
+            # Add control code
+            if len(self.CtlCodes) > 0:
+                CtlCode = self.CtlCodes[0]
+                inst.SetCtlCode(CtlCode)
+                # Remove the control code from temprory storage
+                self.CtlCodes.remove(CtlCode)
+            #else:
+            #    raise UnmatchedControlCode
+            
+            # Add instruction into list
+            Insts.append(inst)
 
     # Parse control code 
     def ParseControlCode(self, Content, ControlCodes):
@@ -140,4 +172,63 @@ class SaSSParser_SM35(SaSSParserBase):
         ControlCodes.append(ControlCode(Content, WaitB, ReadB, WrtB, Yield, Stall))
 
         return ControlCodes
+
+    # Split basic block from the list instruction
+    def SplitBlocks(self, Insts):
+        BBs = []
+        BranchBBs = []
         
+        # Initialize current basic block
+        CurrBB = None
+        PredBB = None
+        BranchBB = None
+
+        for Inst in Insts:
+            if Inst.InCondPath():
+                if not BranchBB.IsInitialized():
+                    # Create the new branch basic block
+                    BranchBB.Init(Inst.id, Inst.pflag)
+
+                # Add instruction into branch basic block
+                BranchBB.AppendInst(Inst)
+                
+            else:
+                if CurrBB == None:
+                    # Create the new basic block
+                    CurrBB = BasicBlock(Inst.id, None)
+                    BBs.append(CurrBB)
+
+                    # Add branch connection
+                    if PredBB != None:
+                        # Setup cpnnection
+                        PredBB.AddSucc(CurrBB)
+                        CurrBB.AddPred(PredBB)
+
+                # Add instruction into main basic block
+                CurrBB.AppendInst(Inst)
+
+                if Inst.IsBranch():
+                    # Set predecessor
+                    PredBB = CurrBB
+
+                    # Cleanup current basic block and branch basic block
+                    CurrBB = None
+
+                    if BranchBB != None and BranchBB.IsEmpty():
+                        # The previous branch instruction does not make corresponding branch BB yet, so it will follow with current branch instruction
+                        # Setup the predecessor and successor for branch basic block
+                        PredBB.AddSucc(BranchBB)
+                        BranchBB.AddPred(PredBB)
+                    else:
+                        # Create an empty basic block
+                        BranchBB = BasicBlock(None, None)
+                        BranchBBs.append(BranchBB)
+
+                        # Setup the predecessor and successor for branch basic block
+                        PredBB.AddSucc(BranchBB)
+                        BranchBB.AddPred(PredBB)
+
+        for BranchBB in BranchBBs:
+            BBs.append(BranchBB)
+            
+        return BBs

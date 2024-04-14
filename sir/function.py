@@ -16,6 +16,7 @@ class Function:
         self.args = []
         self.ArgMap = {}
         self.BlockMap = {}
+        self.DefUse = None
 
     # Resovle instructions' operands
     def ResolveOperands(self, insts):

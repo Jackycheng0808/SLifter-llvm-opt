@@ -37,10 +37,9 @@ struct LoadEliminationPass : public PassInfoMixin<LoadEliminationPass> {
         continue;
       }
 
-      errs() << "Found StoreInst: " << *Store << "\n";
+      // errs() << "Found StoreInst: " << *Store << "\n";
       Value *StoreValue = Store->getValueOperand();
       if (!StoreValue) {
-        errs() << "Warning: Null store value, skipping\n";
         II = NextII;
         continue;
       }
@@ -51,10 +50,9 @@ struct LoadEliminationPass : public PassInfoMixin<LoadEliminationPass> {
         continue;
       }
 
-      errs() << "  RHS is BinaryOperator: " << *RHS << "\n";
+      // errs() << "  RHS is BinaryOperator: " << *RHS << "\n";
       Value *Load1Value = RHS->getOperand(0);
       if (!Load1Value) {
-        errs() << "Warning: Null Load1Value, skipping\n";
         II = NextII;
         continue;
       }
@@ -65,10 +63,9 @@ struct LoadEliminationPass : public PassInfoMixin<LoadEliminationPass> {
         continue;
       }
 
-      errs() << "    Load1 is LoadInst: " << *Load1 << "\n";
+      // errs() << "    Load1 is LoadInst: " << *Load1 << "\n";
       Value *Ptr = Load1->getPointerOperand();
       if (!Ptr) {
-        errs() << "Warning: Null Ptr, skipping\n";
         II = NextII;
         continue;
       }
@@ -87,15 +84,13 @@ struct LoadEliminationPass : public PassInfoMixin<LoadEliminationPass> {
           continue;
         }
 
-        errs() << "      Found LoadInst: " << *Load2 << "\n";
+        // errs() << "      Found LoadInst: " << *Load2 << "\n";
         if (Load2->getPointerOperand() == Ptr) {
-          errs() << "        Load2 points to same Ptr: " << *Ptr << "\n";
           
           auto KK = std::next(JJ);
           while (KK != BB.end()) {
             Instruction *NextNextInst = &*KK;
             if (!NextNextInst) {
-              errs() << "Warning: Null NextNextInst, breaking innermost loop\n";
               break;
             }
 
@@ -105,12 +100,10 @@ struct LoadEliminationPass : public PassInfoMixin<LoadEliminationPass> {
               continue;
             }
 
-            errs() << "          Found StoreInst: " << *StoreNext << "\n";
+            // errs() << "          Found StoreInst: " << *StoreNext << "\n";
             if (StoreNext->getPointerOperand() == Ptr) {
-              errs() << "            StoreNext points to same Ptr: " << *Ptr << "\n";
               Value *StoreNextValue = StoreNext->getValueOperand();
               if (!StoreNextValue) {
-                errs() << "Warning: Null StoreNextValue, skipping\n";
                 ++KK;
                 continue;
               }
@@ -121,13 +114,12 @@ struct LoadEliminationPass : public PassInfoMixin<LoadEliminationPass> {
                 continue;
               }
 
-              errs() << "              RHSNext is BinaryOperator: " << *RHSNext << "\n";
+              errs() << " RHSNext is BinaryOperator: " << *RHSNext << "\n";
               if (RHSNext->getOperand(0) == Load2) {
-                errs() << "                RHSNext uses Load2\n";
+                errs() << " RHSNext uses Load2\n";
                 // Ensure that RHSNext has the expected operand before replacing uses
                 if (Load2->hasOneUse() && RHSNext->getOperand(0) == Load2) {
                   // Perform transformation
-                  errs() << "                  Performing transformation\n";
                   Load2->replaceAllUsesWith(RHS);
                   StoreNext->setOperand(0, RHSNext->getOperand(1));
                   RHSNext->replaceAllUsesWith(RHSNext->getOperand(1));
@@ -138,7 +130,7 @@ struct LoadEliminationPass : public PassInfoMixin<LoadEliminationPass> {
                   NextII = std::next(II);
                   break;
                 } else {
-                  errs() << "                  Load2 does not have the expected uses\n";
+                  errs() << " Load2 does not have the expected uses\n";
                 }
               }
             }

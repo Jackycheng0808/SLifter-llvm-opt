@@ -6,21 +6,20 @@
 
 # Generate .ll from SASS using the provided Python script
 echo "Part 1: Converting SASS to LLVM..."
-python ../main.py -i file/addMatrices.sass -o exp/addMatrices
+python ../main.py -i file/addMatrices_large.sass -o exp/addMatrices
 
 # Ensure the output directory exists
-dir_name="exp"
-
-if [ ! -d "$dir_name" ]; then
-    mkdir "$dir_name"
-    echo "Directory '$dir_name' created."
+output_dir="exp"
+if [ ! -d "$output_dir" ]; then
+    mkdir "$output_dir"
+    echo "Directory '$output_dir' created."
 fi
 
 # Copy the generated .ll file for further modifications
 cp exp/addMatrices.ll exp/addMatrices_mod.ll
 
 # Post-processing
-python convert_add_to_fadd.py exp/addMatrices_mod.ll
+python llvm_post_process.py exp/addMatrices_mod.ll
 echo "SASS to LLVM conversion done."
 
 # ==============================
@@ -30,46 +29,32 @@ echo "SASS to LLVM conversion done."
 echo "Part 2: Optimizing LLVM IR..."
 # Optimize the modified LLVM IR file
 opt -passes='mem2reg' -S exp/addMatrices_mod.ll -o exp/addMatrices_mod_opt.ll
+
+# Uncomment the following lines to apply additional optimizations
 # opt -passes='dce' -S exp/addMatrices_mod_opt.ll -o exp/addMatrices_mod_opt.ll
 # opt -passes='instsimplify' -S exp/addMatrices_mod_opt.ll -o exp/addMatrices_mod_opt.ll
-
 # opt -O1 exp/addMatrices_mod.ll -o exp/addMatrices_mod_opt.ll
-# opt -O1  exp/addMatrices_mod.ll
 
 echo "LLVM optimization done."
 
-# =========================
-# Part 3: Code Generation
-# =========================
+# ==============================
+# Part 3: LLVM Codegen
+# ==============================
 
-echo "Part 3: Code Generation..."
-# Compile the optimized LLVM IR to an object file for macOS-arm64
-llc -filetype=obj -mtriple=aarch64-apple-darwin exp/addMatrices_mod_opt.ll -o exp/addMatrices.o
+# Compile the LLVM IR to an object file
+echo "Part 3: Compiling LLVM IR to object file..."
+llc -filetype=obj exp/addMatrices_mod_opt.ll -o exp/addMatrices.o
 
-# Link the object file to create an executable
-clang -target arm64-apple-macosx11.0.0 exp/addMatrices.o -o exp/addMatrices
+# Compile C code to object file
+echo "Compiling C code to object file..."
+clang -c printInfo.c -o exp/printInfo.o
 
-echo "Code generation done."
+# Link the object files
+echo "Linking object files..."
+clang exp/addMatrices.o exp/printInfo.o -o exp/printInfo
 
-# =========================
-# Part 4: Running and Testing
-# =========================
+# Run the executable
+echo "Running the executable..."
+./exp/printInfo
 
-echo "Part 4: Running the addMatrices program..."
-
-# Execute the program and measure the running time
-start_time_sec=$(date +%s)
-start_time_nsec=$(date +%N)
-./exp/addMatrices
-end_time_sec=$(date +%s)
-end_time_nsec=$(date +%N)
-
-# Calculate execution time in milliseconds
-start_time=$((start_time_sec * 1000000000 + start_time_nsec))
-end_time=$((end_time_sec * 1000000000 + end_time_nsec))
-execution_time=$((end_time - start_time))
-execution_time_in_ms=$((execution_time / 1000000))
-
-echo "Execution time: $execution_time_in_ms ms"
-
-echo "All steps completed successfully."
+echo "Process completed."

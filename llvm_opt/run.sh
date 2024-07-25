@@ -1,26 +1,37 @@
 #!/bin/bash
 
+# Define variables
+sass_file="file/addMatrices_large.sass"
+output_dir="exp"
+initial_ll_file="$output_dir/addMatrices.ll"
+modified_ll_file="$output_dir/addMatrices_mod.ll"
+optimized_ll_file="$output_dir/addMatrices_mod_opt.ll"
+object_file="$output_dir/addMatrices.o"
+c_source_file="printInfo.c"
+c_object_file="$output_dir/printInfo.o"
+executable_file="$output_dir/printInfo"
+
 # ===========================================
 # Part 1: Convert SASS to LLVM (SASS Lifter)
 # ===========================================
 
 # Generate .ll from SASS using the provided Python script
 echo "Part 1: Converting SASS to LLVM..."
-python ../main.py -i file/addMatrices_large.sass -o exp/addMatrices
+python ../main.py -i "$sass_file" -o "$initial_ll_file"
 
 # Ensure the output directory exists
-output_dir="exp"
 if [ ! -d "$output_dir" ]; then
     mkdir "$output_dir"
     echo "Directory '$output_dir' created."
 fi
 
 # Copy the generated .ll file for further modifications
-cp exp/addMatrices.ll exp/addMatrices_mod.ll
+cp "$initial_ll_file" "$modified_ll_file"
 
 # Post-processing
-python llvm_post_process.py exp/addMatrices_mod.ll
-echo "SASS to LLVM conversion done."
+python llvm_post_process.py "$modified_ll_file"
+echo -e "SASS to LLVM conversion done.\n"
+
 
 # ==============================
 # Part 2: LLVM Optimization
@@ -28,14 +39,14 @@ echo "SASS to LLVM conversion done."
 
 echo "Part 2: Optimizing LLVM IR..."
 # Optimize the modified LLVM IR file
-opt -passes='mem2reg' -S exp/addMatrices_mod.ll -o exp/addMatrices_mod_opt.ll
+opt -passes='mem2reg' -S "$modified_ll_file" -o "$optimized_ll_file"
 
 # Uncomment the following lines to apply additional optimizations
-# opt -passes='dce' -S exp/addMatrices_mod_opt.ll -o exp/addMatrices_mod_opt.ll
-# opt -passes='instsimplify' -S exp/addMatrices_mod_opt.ll -o exp/addMatrices_mod_opt.ll
-# opt -O1 exp/addMatrices_mod.ll -o exp/addMatrices_mod_opt.ll
+# opt -passes='dce' -S "$optimized_ll_file" -o "$optimized_ll_file"
+# opt -passes='instsimplify' -S "$optimized_ll_file" -o "$optimized_ll_file"
+# opt -O1 "$modified_ll_file" -o "$optimized_ll_file"
 
-echo "LLVM optimization done."
+echo -e "LLVM optimization done.\n"
 
 # ==============================
 # Part 3: LLVM Codegen
@@ -43,18 +54,15 @@ echo "LLVM optimization done."
 
 # Compile the LLVM IR to an object file
 echo "Part 3: Compiling LLVM IR to object file..."
-llc -filetype=obj exp/addMatrices_mod_opt.ll -o exp/addMatrices.o
+llc -filetype=obj "$optimized_ll_file" -o "$object_file"
 
 # Compile C code to object file
 echo "Compiling C code to object file..."
-clang -c printInfo.c -o exp/printInfo.o
-
-# Link the object files
-echo "Linking object files..."
-clang exp/addMatrices.o exp/printInfo.o -o exp/printInfo
+clang -c "$c_source_file" -o "$c_object_file"
+clang "$object_file" "$c_object_file" -o "$executable_file"
 
 # Run the executable
-echo "Running the executable..."
-./exp/printInfo
+echo
+./"$executable_file"
 
-echo "Process completed."
+echo -e "Process completed. \n"

@@ -10,7 +10,7 @@ This script automates the process of converting SASS (Shader Assembly) to LLVM I
 
 ## Usage
 
-1. Place your SASS file in the `file/` directory with the name `addMatrices_large.sass`.
+1. Place your SASS file in the `file/` directory with the name `addMatrices.sass`.
 2. Ensure the SASS Lifter script (`main.py`) is in the parent directory.
 3. Run the script:
 

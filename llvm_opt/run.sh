@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # Define variables
-sass_file="file/addMatrices_large.sass"
+sass_file="file/addMatrices.sass"
 output_dir="exp"
-initial_ll_file="$output_dir/addMatrices.ll"
+initial_ll_file="$output_dir/addMatrices"
 modified_ll_file="$output_dir/addMatrices_mod.ll"
 optimized_ll_file="$output_dir/addMatrices_mod_opt.ll"
 object_file="$output_dir/addMatrices.o"
 c_source_file="printInfo.c"
-c_object_file="$output_dir/printInfo.o"
-executable_file="$output_dir/printInfo"
+c_object_file="$output_dir/main.o"
+executable_file="$output_dir/main"
 
 # ===========================================
 # Part 1: Convert SASS to LLVM (SASS Lifter)
@@ -26,7 +26,7 @@ if [ ! -d "$output_dir" ]; then
 fi
 
 # Copy the generated .ll file for further modifications
-cp "$initial_ll_file" "$modified_ll_file"
+cp "$initial_ll_file".ll "$modified_ll_file"
 
 # Post-processing
 python llvm_post_process.py "$modified_ll_file"
